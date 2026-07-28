@@ -17,4 +17,4 @@ mod/.project
 
 # Bridge
 bridge/node_modules/
-bridge/multichat-bridge.toml
+bridge/.env

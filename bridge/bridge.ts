@@ -18,8 +18,9 @@
 //   discord  two-way bridge (gateway inbound, webhook/bot outbound)
 //   cli      stdin/stdout test connector
 //
-// Config: ./multichat-bridge.toml (see multichat-bridge.example.toml), overridable via
-//   CONFIG=<path>  REDIS_URL=redis://...  DISCORD_TOKEN=<bot token>
+// Config: environment variables only - see .env.example for the full reference.
+// The discord connector activates when at least one DISCORD_CHANNEL_<n> group is set,
+// the cli connector via CLI_ENABLED=true.
 //
 // Run: bun run bridge.ts
 
@@ -31,14 +32,14 @@ import { createCliConnector } from "./src/connectors/cli/index.ts";
 
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), "-", ...args);
 
-const cfg = await loadConfig(Bun.env.CONFIG ?? "./multichat-bridge.toml");
+const cfg = loadConfig();
 
 const connectors: Connector[] = [];
 if (cfg.discord) connectors.push(createDiscordConnector(cfg.discord, (...a) => log("[discord]", ...a)));
 if (cfg.cli) connectors.push(createCliConnector(cfg.cli, (...a) => log("[cli]", ...a)));
 
 if (connectors.length === 0) {
-  console.error("No connectors enabled in config - nothing to do. See multichat-bridge.example.toml");
+  console.error("No connectors configured - nothing to do. See .env.example (DISCORD_CHANNEL_1_* or CLI_ENABLED)");
   process.exit(1);
 }
 

@@ -1,15 +1,22 @@
-# Deploys the bridge. Point REDIS_URL at the same Redis instance the Link-Mod servers
-# use (e.g. the webshop stack's redis service, or the throwaway one from the repo-root
-# docker-compose.yml for local testing). Config file: copy multichat-bridge.example.toml
-# to multichat-bridge.toml next to this file; secrets go through the environment.
+# Deploys the bridge. All configuration is env-only (see .env.example).
+#
+# Dokploy: set the variables in the service's Environment tab. Dokploy writes them to a
+# .env file NEXT TO THIS COMPOSE FILE inside its clone of the repo
+# (/etc/dokploy/compose/<app>/code/<compose dir>/.env), regenerated on every deploy -
+# never edit that file by hand. Both entries below are optional so the stack also works
+# locally (copy .env.example to .env) or with setups that put the .env at the repo root;
+# the one next to this file wins because it is listed last.
+#
+# REDIS_URL must point at the same Redis instance the Link-Mod servers use; it defaults
+# to redis://redis:6379 so it slots into a stack that already has a "redis" service.
 services:
   bridge:
     build: .
     restart: unless-stopped
     environment:
       TZ: Europe/Berlin
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
-      CONFIG: /app/multichat-bridge.toml
-    volumes:
-      - ./multichat-bridge.toml:/app/multichat-bridge.toml:ro
+    env_file:
+      - path: ../.env
+        required: false
+      - path: .env
+        required: false

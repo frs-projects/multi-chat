@@ -69,18 +69,18 @@ the mod — callers cannot spoof another server.
 
 ```sh
 cd bridge
-cp multichat-bridge.example.toml multichat-bridge.toml   # then edit
-DISCORD_TOKEN=... bun run bridge.ts
+cp .env.example .env   # then edit
+bun run bridge.ts
 ```
 
-Or containerized: `cd bridge && docker compose up -d --build` (see
-`bridge/docker-compose.yml` — mounts `multichat-bridge.toml`, secrets via
-`REDIS_URL` / `DISCORD_TOKEN` environment).
+Or containerized: `cd bridge && docker compose up -d --build`. Configuration is
+**env-only** — no config files. See [bridge/.env.example](bridge/.env.example) for the
+full reference; in a deploy platform (Dokploy etc.) just set the variables in the UI.
 
 Zero npm dependencies; Redis via Bun's built-in client, Discord via a minimal
 hand-rolled Gateway client. Idle cost is one blocked Redis read plus a heartbeat.
 Each connector gets its own consumer group (`bridge:<id>`) and loop, so a slow platform
-never blocks another. Env overrides: `CONFIG`, `REDIS_URL`, `DISCORD_TOKEN`.
+never blocks another.
 
 ### Discord setup
 
@@ -91,16 +91,17 @@ never blocks another. Env overrides: `CONFIG`, `REDIS_URL`, `DISCORD_TOKEN`.
 4. Create a webhook in each bridged channel (Channel settings → Integrations) for
    outbound messages with per-player name + avatar; without a webhook the bridge falls
    back to plain bot messages.
-5. Fill a `[[connectors.discord.channels]]` block per channel: `channel` id for inbound,
-   `webhook` URL for outbound, `types`/`sources` filters, `inbound` toggle.
+5. Set one `DISCORD_CHANNEL_<n>_*` variable group per channel (numbering starts at 1):
+   `_ID` for inbound reading, `_WEBHOOK` for outbound, `_TYPES`/`_SOURCES` filters,
+   `_INBOUND` toggle. The connector activates as soon as one group is set.
 
 Mentions are neutralized (`@everyone` etc. never ping) and Minecraft § codes are stripped.
 
 ### Adding another platform
 
 One folder under `bridge/src/connectors/<name>/` exporting a factory that returns the
-`Connector` interface (`start`/`stop`/`deliver` + `ctx.publish`), one config block, one
-line in `bridge.ts`. The `cli` connector (~40 lines) is the reference.
+`Connector` interface (`start`/`stop`/`deliver` + `ctx.publish`), a few env variables in
+`config.ts`, one line in `bridge.ts`. The `cli` connector (~40 lines) is the reference.
 
 ## Local testing without Discord
 
@@ -108,7 +109,7 @@ line in `bridge.ts`. The `cli` connector (~40 lines) is the reference.
 docker compose up -d                 # throwaway Redis on 127.0.0.1:6379
 cd mod && ./gradlew :forge-1.20.1:runServer   # dev server; set server.id in run/config/
 # in a second terminal:
-cd bridge && CONFIG=... bun run bridge.ts     # with [connectors.cli] enabled
+cd bridge && CLI_ENABLED=true bun run bridge.ts
 ```
 
 Typed lines in the bridge terminal appear in the server chat and vice versa. A second
