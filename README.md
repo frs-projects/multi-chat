@@ -97,6 +97,21 @@ never blocks another.
 
 Mentions are neutralized (`@everyone` etc. never ping) and Minecraft § codes are stripped.
 
+### Bot status counters
+
+With a bot token the connector shows live counters as its Discord status, e.g.
+*Watching 12 players on 3 servers*. Both are tallied from the stream itself: players from
+`join`/`leave` events (as a set per server, so duplicate joins can't inflate it), servers
+from `status` events — `started` marks a server up and resets its player list, `stopping`
+takes it and its players back out. A `join` also implies its server is up, which covers a
+missed status event.
+
+The tally therefore starts at zero on bridge start and reflects only what has happened
+since; servers already running are counted from their next event onward. Updates are
+throttled to one per 15s (Discord allows 5 per 20s) and re-pushed after a reconnect.
+Configure with `DISCORD_PRESENCE_TEMPLATE` (`{players}`, `{servers}`),
+`DISCORD_PRESENCE_ACTIVITY`, `DISCORD_PRESENCE_ENABLED`.
+
 ### Adding another platform
 
 One folder under `bridge/src/connectors/<name>/` exporting a factory that returns the

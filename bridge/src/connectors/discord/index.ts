@@ -4,9 +4,14 @@ import type { ChannelRule, DiscordConfig } from "../../core/config.ts";
 import { format, matches, stripColors } from "../../core/router.ts";
 import { DiscordGateway, type GatewayMessageEvent } from "./gateway.ts";
 import { DiscordRest } from "./rest.ts";
+import { PresenceTracker } from "./presence.ts";
 
 // Discord connector: gateway for inbound (discord -> stream), webhook-first for
 // outbound (stream -> discord, falls back to bot messages when no webhook is set).
+// Every delivered event also feeds the presence counters shown as the bot's status.
+
+/** Discord allows 5 presence updates per 20s per session; one per 15s stays well clear. */
+const PRESENCE_MIN_INTERVAL_MS = 15_000;
 
 /** Webhook URLs look like .../api/webhooks/<id>/<token>; the id shows up as webhook_id on MESSAGE_CREATE. */
 function webhookId(url: string | undefined): string | undefined {
@@ -17,6 +22,27 @@ export function createDiscordConnector(cfg: DiscordConfig, log: (...args: unknow
   const rest = new DiscordRest(log);
   const ownWebhookIds = new Set(cfg.channels.map((c) => webhookId(c.webhook)).filter(Boolean));
   let gateway: DiscordGateway | null = null;
+
+  // Presence needs a bot session; webhook-only setups have no status to update.
+  const presence = cfg.presence.enabled && cfg.token ? new PresenceTracker() : null;
+  let presenceTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastPresenceAt = 0;
+
+  /** Coalesces bursts of events (a restart re-joining everyone) into one throttled push. */
+  function schedulePresenceUpdate(): void {
+    if (!presence || presenceTimer) return;
+    const wait = Math.max(0, PRESENCE_MIN_INTERVAL_MS - (Date.now() - lastPresenceAt));
+    presenceTimer = setTimeout(() => {
+      presenceTimer = null;
+      lastPresenceAt = Date.now();
+      const text = presence.render(cfg.presence.template);
+      gateway?.setPresence(
+        cfg.presence.activityType === 4
+          ? { name: "Custom Status", type: 4, state: text }
+          : { name: text, type: cfg.presence.activityType },
+      );
+    }, wait);
+  }
 
   function onDiscordMessage(ctx: ConnectorCtx, m: GatewayMessageEvent): void {
     const rule = cfg.channels.find((r) => r.channel === m.channel_id && r.inbound !== false);
@@ -59,16 +85,21 @@ export function createDiscordConnector(cfg: DiscordConfig, log: (...args: unknow
       if (cfg.token) {
         gateway = new DiscordGateway(cfg.token, (m) => onDiscordMessage(ctx, m), log);
         gateway.start();
+        // Counters start at zero and fill in as events arrive; show that rather than nothing.
+        schedulePresenceUpdate();
       } else {
         log("no DISCORD_TOKEN set - running outbound-only (webhooks), no messages read from Discord");
       }
     },
 
     async stop() {
+      if (presenceTimer) clearTimeout(presenceTimer);
+      presenceTimer = null;
       gateway?.stop();
     },
 
     async deliver(msg: ChatMessage) {
+      if (presence?.apply(msg)) schedulePresenceUpdate();
       for (const rule of cfg.channels) {
         if (matches(rule, msg)) {
           await deliverTo(rule, msg);

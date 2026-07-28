@@ -20,6 +20,15 @@ export interface ChannelRule {
   inbound?: boolean;
 }
 
+/** Bot status showing the counters the connector keeps from join/leave/status events. */
+export interface PresenceConfig {
+  enabled: boolean;
+  /** Status text; {players} and {servers} are filled from the live counters. */
+  template: string;
+  /** Discord activity type: 0 playing, 1 streaming, 2 listening, 3 watching, 4 custom, 5 competing. */
+  activityType: number;
+}
+
 export interface DiscordConfig {
   enabled: boolean;
   sourceId: string;
@@ -27,6 +36,7 @@ export interface DiscordConfig {
   token: string;
   channels: ChannelRule[];
   formats: Record<string, string>;
+  presence: PresenceConfig;
 }
 
 export interface CliConfig {
@@ -93,6 +103,19 @@ function discordChannels(): ChannelRule[] {
   return rules;
 }
 
+const ACTIVITY_TYPES: Record<string, number> = {
+  playing: 0, streaming: 1, listening: 2, watching: 3, custom: 4, competing: 5,
+};
+
+function discordPresence(): PresenceConfig {
+  const activity = env("DISCORD_PRESENCE_ACTIVITY", "watching").toLowerCase();
+  return {
+    enabled: envBool("DISCORD_PRESENCE_ENABLED", true),
+    template: env("DISCORD_PRESENCE_TEMPLATE", "{players} players on {servers} servers"),
+    activityType: ACTIVITY_TYPES[activity] ?? ACTIVITY_TYPES.watching,
+  };
+}
+
 function discordFormats(): Record<string, string> {
   const formats = { ...DISCORD_DEFAULT_FORMATS };
   for (const key of Object.keys(DISCORD_DEFAULT_FORMATS)) {
@@ -121,6 +144,7 @@ export function loadConfig(): BridgeConfig {
       token: env("DISCORD_TOKEN"),
       channels,
       formats: discordFormats(),
+      presence: discordPresence(),
     };
   }
 

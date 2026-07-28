@@ -12,6 +12,7 @@ const INTENTS = (1 << 0) | (1 << 9) | (1 << 15); // GUILDS | GUILD_MESSAGES | ME
 const OP_DISPATCH = 0;
 const OP_HEARTBEAT = 1;
 const OP_IDENTIFY = 2;
+const OP_PRESENCE_UPDATE = 3;
 const OP_RESUME = 6;
 const OP_RECONNECT = 7;
 const OP_INVALID_SESSION = 9;
@@ -26,6 +27,14 @@ export interface GatewayMessageEvent {
   member?: { nick?: string | null };
 }
 
+/** One entry of the bot's presence; type is a Discord activity type (0 playing ... 5 competing). */
+export interface GatewayActivity {
+  name: string;
+  type: number;
+  /** Shown as the status text for custom activities (type 4), ignored otherwise. */
+  state?: string;
+}
+
 export class DiscordGateway {
   private ws: WebSocket | null = null;
   private running = false;
@@ -35,6 +44,7 @@ export class DiscordGateway {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private ackReceived = true;
   private backoff = 1000;
+  private presence: GatewayActivity | null = null;
 
   constructor(
     private readonly token: string,
@@ -45,6 +55,16 @@ export class DiscordGateway {
   start(): void {
     this.running = true;
     this.connect();
+  }
+
+  /**
+   * Sets the bot's status (op 3). Kept as the latest known presence and replayed on
+   * identify/resume, so a reconnect doesn't leave a stale status behind. Discord allows
+   * 5 presence updates per 20s per session - callers must throttle.
+   */
+  setPresence(activity: GatewayActivity): void {
+    this.presence = activity;
+    this.send(OP_PRESENCE_UPDATE, presencePayload(activity));
   }
 
   stop(): void {
@@ -126,6 +146,8 @@ export class DiscordGateway {
       case "RESUMED":
         this.backoff = 1000;
         this.log("gateway session resumed");
+        // A resumed session keeps whatever presence it had; ours may have moved on.
+        if (this.presence) this.send(OP_PRESENCE_UPDATE, presencePayload(this.presence));
         break;
       case "MESSAGE_CREATE":
         this.onMessage(d as GatewayMessageEvent);
@@ -138,6 +160,8 @@ export class DiscordGateway {
       token: this.token,
       intents: INTENTS,
       properties: { os: "linux", browser: "multichat-bridge", device: "multichat-bridge" },
+      // Carried on identify so a fresh session comes up with the status already set.
+      presence: this.presence ? presencePayload(this.presence) : undefined,
     });
   }
 
@@ -173,4 +197,9 @@ export class DiscordGateway {
       this.ws.send(JSON.stringify({ op, d }));
     }
   }
+}
+
+/** Presence update / identify presence body. */
+function presencePayload(activity: GatewayActivity) {
+  return { since: null, activities: [activity], status: "online", afk: false };
 }
