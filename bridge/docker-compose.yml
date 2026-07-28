@@ -1,0 +1,15 @@
+# Deploys the bridge. Point REDIS_URL at the same Redis instance the Link-Mod servers
+# use (e.g. the webshop stack's redis service, or the throwaway one from the repo-root
+# docker-compose.yml for local testing). Config file: copy multichat-bridge.example.toml
+# to multichat-bridge.toml next to this file; secrets go through the environment.
+services:
+  bridge:
+    build: .
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Berlin
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      CONFIG: /app/multichat-bridge.toml
+    volumes:
+      - ./multichat-bridge.toml:/app/multichat-bridge.toml:ro

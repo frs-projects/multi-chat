@@ -1,0 +1,11 @@
+{
+  "name": "multichat-bridge",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run bridge.ts",
+    "dev": "bun --watch bridge.ts",
+    "test": "bun test"
+  }
+}

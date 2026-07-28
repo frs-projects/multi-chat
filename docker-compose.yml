@@ -1,0 +1,12 @@
+# Local test infrastructure: just a Redis. In production, point the mod and bridge at
+# your existing Redis instance instead (e.g. the webshop stack's).
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
