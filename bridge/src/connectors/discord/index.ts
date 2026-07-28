@@ -13,6 +13,15 @@ import { PresenceTracker } from "./presence.ts";
 /** Discord allows 5 presence updates per 20s per session; one per 15s stays well clear. */
 const PRESENCE_MIN_INTERVAL_MS = 15_000;
 
+/**
+ * Rosters are telemetry for the bot status, not chat: relaying them would post a player
+ * list to every channel every few seconds. A channel has to name the type explicitly
+ * (DISCORD_CHANNEL_n_TYPES=roster) to get them - a "*" filter is not enough.
+ */
+function isSilentTelemetry(rule: ChannelRule, msg: ChatMessage): boolean {
+  return msg.type === "roster" && !rule.types?.includes("roster");
+}
+
 /** Webhook URLs look like .../api/webhooks/<id>/<token>; the id shows up as webhook_id on MESSAGE_CREATE. */
 function webhookId(url: string | undefined): string | undefined {
   return url?.match(/\/webhooks\/(\d+)\//)?.[1];
@@ -26,6 +35,7 @@ export function createDiscordConnector(cfg: DiscordConfig, log: (...args: unknow
   // Presence needs a bot session; webhook-only setups have no status to update.
   const presence = cfg.presence.enabled && cfg.token ? new PresenceTracker() : null;
   let presenceTimer: ReturnType<typeof setTimeout> | null = null;
+  let expiryTimer: ReturnType<typeof setInterval> | null = null;
   let lastPresenceAt = 0;
 
   /** Coalesces bursts of events (a restart re-joining everyone) into one throttled push. */
@@ -87,6 +97,12 @@ export function createDiscordConnector(cfg: DiscordConfig, log: (...args: unknow
         gateway.start();
         // Counters start at zero and fill in as events arrive; show that rather than nothing.
         schedulePresenceUpdate();
+        if (presence && cfg.presence.rosterTtlMs > 0) {
+          // Nothing arrives when a server dies mid-run, so the sweep has to be on a timer.
+          expiryTimer = setInterval(() => {
+            if (presence.expire(cfg.presence.rosterTtlMs)) schedulePresenceUpdate();
+          }, Math.max(5000, Math.floor(cfg.presence.rosterTtlMs / 4)));
+        }
       } else {
         log("no DISCORD_TOKEN set - running outbound-only (webhooks), no messages read from Discord");
       }
@@ -94,14 +110,16 @@ export function createDiscordConnector(cfg: DiscordConfig, log: (...args: unknow
 
     async stop() {
       if (presenceTimer) clearTimeout(presenceTimer);
+      if (expiryTimer) clearInterval(expiryTimer);
       presenceTimer = null;
+      expiryTimer = null;
       gateway?.stop();
     },
 
     async deliver(msg: ChatMessage) {
       if (presence?.apply(msg)) schedulePresenceUpdate();
       for (const rule of cfg.channels) {
-        if (matches(rule, msg)) {
+        if (matches(rule, msg) && !isSilentTelemetry(rule, msg)) {
           await deliverTo(rule, msg);
         }
       }

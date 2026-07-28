@@ -3,7 +3,7 @@
 // The Minecraft-side Link-Mod and this bridge share one Redis stream (default
 // "multichat:events") of flat field/value entries:
 //   source  producing endpoint id ("EU_1", "discord", ...)
-//   type    chat | join | leave | death | advancement | status | <custom via mod API>
+//   type    chat | join | leave | death | advancement | status | roster | <custom via mod API>
 //   uuid    player uuid (empty for non-player events)
 //   name    display name
 //   content plain-text payload

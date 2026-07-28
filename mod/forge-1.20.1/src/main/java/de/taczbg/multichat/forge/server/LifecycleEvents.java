@@ -76,6 +76,9 @@ public final class LifecycleEvents {
         if (MultiChatConfig.forwardStatus()) {
             MultiChat.CORE.publish("status", "", "", "started", "");
         }
+        // Right after a reload the world may already be populated - don't make consumers
+        // wait a full interval for the first roster.
+        RosterPublisher.publishNow(server);
     }
 
     @SubscribeEvent

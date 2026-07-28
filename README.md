@@ -37,7 +37,10 @@ empty) and the `[redis]` connection, then restart or run `/multichat reload`.
 
 Forwarded out of the box (each toggleable under `[forward]`): chat, join/leave, death
 messages, advancements (respecting `announceAdvancements` / `showDeathMessages`
-gamerules), and server started/stopping status. What gets *printed* locally is
+gamerules), server started/stopping status, and a periodic `roster` event listing the
+online players (`forward.rosterSeconds`, default 30, `0` disables). Rosters are
+telemetry — never printed in chat — and let consumers show an exact player count instead
+of tallying join/leave events. What gets *printed* locally is
 controlled under `[display]`: per-type format templates with `{source}` `{name}`
 `{message}` placeholders and § color codes, plus source/type ignore lists.
 
@@ -100,17 +103,24 @@ Mentions are neutralized (`@everyone` etc. never ping) and Minecraft § codes ar
 ### Bot status counters
 
 With a bot token the connector shows live counters as its Discord status, e.g.
-*Watching 12 players on 3 servers*. Both are tallied from the stream itself: players from
-`join`/`leave` events (as a set per server, so duplicate joins can't inflate it), servers
-from `status` events — `started` marks a server up and resets its player list, `stopping`
-takes it and its players back out. A `join` also implies its server is up, which covers a
-missed status event.
+*Watching 12 players on 3 servers*, taken from the stream itself:
 
-The tally therefore starts at zero on bridge start and reflects only what has happened
-since; servers already running are counted from their next event onward. Updates are
-throttled to one per 15s (Discord allows 5 per 20s) and re-pushed after a reconnect.
-Configure with `DISCORD_PRESENCE_TEMPLATE` (`{players}`, `{servers}`),
-`DISCORD_PRESENCE_ACTIVITY`, `DISCORD_PRESENCE_ENABLED`.
+- **`roster` events** are authoritative: each one replaces what the bridge knew about that
+  server, so a lost event or a crash can't leave the count drifting. They also act as a
+  heartbeat — a server that stops sending them for `DISCORD_PRESENCE_ROSTER_TTL_SECONDS`
+  (default 120) drops out of the counters even without a `stopping` event.
+- **`join`/`leave`/`status` events** keep the number live between two rosters, and are the
+  whole story for servers that don't send rosters (`rosterSeconds = 0`, older mod build).
+  Players are tracked as a set per server, so duplicate joins can't inflate the count;
+  `started` resets a server to empty, `stopping` removes it and its players.
+
+A roster-less server therefore starts at zero when the bridge boots and is counted from
+its next event onward; a roster-sending one is exact within one interval. Rosters are not
+relayed to any channel unless a rule names the type (`DISCORD_CHANNEL_n_TYPES=roster`) —
+a `*` filter deliberately doesn't match them. Status updates are throttled to one per 15s
+(Discord allows 5 per 20s) and re-pushed after a reconnect. Configure with
+`DISCORD_PRESENCE_TEMPLATE` (`{players}`, `{servers}`), `DISCORD_PRESENCE_ACTIVITY`,
+`DISCORD_PRESENCE_ENABLED`.
 
 ### Adding another platform
 

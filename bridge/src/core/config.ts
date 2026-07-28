@@ -27,6 +27,8 @@ export interface PresenceConfig {
   template: string;
   /** Discord activity type: 0 playing, 1 streaming, 2 listening, 3 watching, 4 custom, 5 competing. */
   activityType: number;
+  /** A server that sent rosters but has gone quiet this long is treated as down. */
+  rosterTtlMs: number;
 }
 
 export interface DiscordConfig {
@@ -113,6 +115,8 @@ function discordPresence(): PresenceConfig {
     enabled: envBool("DISCORD_PRESENCE_ENABLED", true),
     template: env("DISCORD_PRESENCE_TEMPLATE", "{players} players on {servers} servers"),
     activityType: ACTIVITY_TYPES[activity] ?? ACTIVITY_TYPES.watching,
+    // Default covers a few missed broadcasts at the mod's default rosterSeconds = 30.
+    rosterTtlMs: envNum("DISCORD_PRESENCE_ROSTER_TTL_SECONDS", 120) * 1000,
   };
 }
 

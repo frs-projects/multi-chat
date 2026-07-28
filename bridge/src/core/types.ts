@@ -3,7 +3,7 @@
 export interface ChatMessage {
   /** producing endpoint: a server id like "EU_1" or a connector id like "discord" */
   source: string;
-  /** "chat" | "join" | "leave" | "death" | "advancement" | "status" | custom */
+  /** "chat" | "join" | "leave" | "death" | "advancement" | "status" | "roster" | custom */
   type: string;
   /** player UUID, empty for non-player events */
   uuid: string;

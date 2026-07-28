@@ -1,11 +1,18 @@
-// Live counters behind the bot's Discord status: players online and servers up, derived
-// purely from the join/leave/status events flowing past on the stream. Nobody publishes
-// totals, so the bridge keeps its own tally.
+// Live counters behind the bot's Discord status: players online and servers up.
 //
-// Players are tracked as a set per source instead of a bare +1/-1 counter: a duplicate
+// Two sources of truth, in this order:
+//   roster  periodic "here is exactly who is online" broadcast from the Link-Mod
+//           (forward.rosterSeconds). Authoritative, self-healing, and doubles as a
+//           heartbeat - a server whose rosters stop arriving is dropped (see expire()).
+//   join/leave/status  the fallback tally, used for servers that don't send rosters
+//           (feature disabled, older mod version) and to keep the number responsive
+//           between two rosters.
+//
+// Players are tracked as a set per source rather than a bare +1/-1 counter: a duplicate
 // join (reconnect storm, replayed stream entry) then can't inflate the number, and a
-// server going down drops exactly its own players. The tally starts empty on bridge
-// start - servers that were already up are only counted once they emit an event.
+// server going down drops exactly its own players. Tally-only servers start at zero on
+// bridge start, so they're counted from their next event onward; roster servers are
+// correct one interval after the bridge comes up.
 
 import type { ChatMessage } from "../../core/types.ts";
 
@@ -17,30 +24,42 @@ export interface PresenceCounts {
   servers: number;
 }
 
+interface SourceState {
+  /** player keys currently online, from rosters and join/leave events alike */
+  players: Set<string>;
+  /** exact count from the last roster; null for sources that never sent one */
+  rosterCount: number | null;
+  /** how many names that roster carried - fewer than rosterCount when the list was capped */
+  rosterNames: number;
+  /** epoch millis of the last roster; 0 = never */
+  rosterAt: number;
+}
+
 export class PresenceTracker {
-  private readonly playersBySource = new Map<string, Set<string>>();
-  private readonly onlineServers = new Set<string>();
+  private readonly sources = new Map<string, SourceState>();
 
   /** Folds one stream event in; true when the counts changed and the status needs a push. */
-  apply(msg: ChatMessage): boolean {
-    switch (msg.type) {
-      case "join":
-        return this.addPlayer(msg.source, playerKey(msg));
-      case "leave":
-        return this.removePlayer(msg.source, playerKey(msg));
-      case "status":
-        return ONLINE_STATUS.has(msg.content.trim().toLowerCase())
-          ? this.serverUp(msg.source)
-          : this.serverDown(msg.source);
-      default:
-        return false;
-    }
+  apply(msg: ChatMessage, now: number = Date.now()): boolean {
+    return this.changed(() => this.mutate(msg, now));
+  }
+
+  /**
+   * Drops servers whose rosters stopped arriving (crash, network partition, no "stopping"
+   * event). Only servers that ever sent a roster are subject to this - the others have no
+   * heartbeat to miss.
+   */
+  expire(ttlMs: number, now: number = Date.now()): boolean {
+    return this.changed(() => {
+      for (const [source, state] of this.sources) {
+        if (state.rosterAt > 0 && now - state.rosterAt > ttlMs) this.sources.delete(source);
+      }
+    });
   }
 
   counts(): PresenceCounts {
     let players = 0;
-    for (const set of this.playersBySource.values()) players += set.size;
-    return { players, servers: this.onlineServers.size };
+    for (const state of this.sources.values()) players += playerCount(state);
+    return { players, servers: this.sources.size };
   }
 
   /** Fills {players} {servers} in the status template. */
@@ -51,42 +70,71 @@ export class PresenceTracker {
       .replaceAll("{servers}", String(servers));
   }
 
-  private addPlayer(source: string, key: string): boolean {
-    if (!source || !key) return false;
-    // A join proves the server is up even if we missed (or never got) its status event.
-    const wasOffline = !this.onlineServers.has(source);
-    this.onlineServers.add(source);
-    let players = this.playersBySource.get(source);
-    if (!players) this.playersBySource.set(source, (players = new Set()));
-    const isNew = !players.has(key);
-    players.add(key);
-    return isNew || wasOffline;
+  private mutate(msg: ChatMessage, now: number): void {
+    if (!msg.source) return;
+    switch (msg.type) {
+      case "roster":
+        this.applyRoster(msg, now);
+        break;
+      case "join": {
+        const key = playerKey(msg);
+        // A join proves the server is up even if we missed (or never got) its status event.
+        if (key) this.state(msg.source).players.add(key);
+        break;
+      }
+      case "leave": {
+        const key = playerKey(msg);
+        if (key) this.sources.get(msg.source)?.players.delete(key);
+        break;
+      }
+      case "status":
+        // Down: the server and its players leave the tally. Up: it is freshly started, so
+        // whatever we had for it is stale - reset it to online with nobody on.
+        this.sources.delete(msg.source);
+        if (ONLINE_STATUS.has(msg.content.trim().toLowerCase())) this.state(msg.source);
+        break;
+    }
   }
 
-  private removePlayer(source: string, key: string): boolean {
-    if (!source || !key) return false;
-    return this.playersBySource.get(source)?.delete(key) ?? false;
+  private applyRoster(msg: ChatMessage, now: number): void {
+    const names = msg.content.split(",").map((n) => n.trim()).filter(Boolean);
+    const reported = Number.parseInt(msg.meta, 10);
+    const state = this.state(msg.source);
+    state.players = new Set(names);
+    state.rosterNames = names.length;
+    state.rosterCount = Number.isFinite(reported) && reported >= 0 ? reported : names.length;
+    state.rosterAt = now;
   }
 
-  /** A server announcing "started" is freshly up, so its player list resets to empty. */
-  private serverUp(source: string): boolean {
-    if (!source) return false;
-    const hadPlayers = (this.playersBySource.get(source)?.size ?? 0) > 0;
-    this.playersBySource.delete(source);
-    const wasOffline = !this.onlineServers.has(source);
-    this.onlineServers.add(source);
-    return hadPlayers || wasOffline;
+  private state(source: string): SourceState {
+    let state = this.sources.get(source);
+    if (!state) {
+      state = { players: new Set(), rosterCount: null, rosterNames: 0, rosterAt: 0 };
+      this.sources.set(source, state);
+    }
+    return state;
   }
 
-  private serverDown(source: string): boolean {
-    if (!source) return false;
-    const hadPlayers = (this.playersBySource.get(source)?.size ?? 0) > 0;
-    this.playersBySource.delete(source);
-    return this.onlineServers.delete(source) || hadPlayers;
+  /** Runs a mutation and reports whether it moved either counter. */
+  private changed(mutate: () => void): boolean {
+    const before = this.counts();
+    mutate();
+    const after = this.counts();
+    return before.players !== after.players || before.servers !== after.servers;
   }
 }
 
-/** uuid where we have one, display name otherwise (bridge-published events carry no uuid). */
+/**
+ * Roster count corrected by the joins/leaves seen since, so the number stays live between
+ * two rosters. Equals the set size while rosters carry every name (the normal case); the
+ * arithmetic only matters for a capped list, where the set is short by a fixed offset.
+ */
+function playerCount(state: SourceState): number {
+  if (state.rosterCount === null) return state.players.size;
+  return Math.max(0, state.rosterCount + state.players.size - state.rosterNames);
+}
+
+/** Name first: it is what rosters carry, so join/leave events line up with them. */
 function playerKey(msg: ChatMessage): string {
-  return msg.uuid || msg.name;
+  return msg.name || msg.uuid;
 }

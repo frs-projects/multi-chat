@@ -12,12 +12,14 @@ import java.util.Map;
  * JSON library. Unknown extra fields written by other producers are ignored on read.
  *
  * @param source    id of the producing endpoint (server id like "EU_1", or connector id like "discord")
- * @param type      "chat", "join", "leave", "death", "advancement", "status", or any custom type
+ * @param type      "chat", "join", "leave", "death", "advancement", "status", "roster", or any custom type
  * @param uuid      player UUID string; empty for non-player events
  * @param name      player/display name; empty for e.g. "status"
- * @param content   plain-text payload; empty for join/leave (consumers format from type + name)
+ * @param content   plain-text payload; empty for join/leave (consumers format from type + name),
+ *                  comma-separated player names for "roster"
  * @param timestamp epoch millis at publish time
- * @param meta      optional free-form string for custom publishers; empty when unused
+ * @param meta      optional free-form string for custom publishers; the exact player count
+ *                  for "roster"; empty when unused
  */
 public record ChatMessage(String source, String type, String uuid, String name,
                           String content, long timestamp, String meta) {

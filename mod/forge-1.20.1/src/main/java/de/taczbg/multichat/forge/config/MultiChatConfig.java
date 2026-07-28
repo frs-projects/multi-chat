@@ -48,6 +48,7 @@ public final class MultiChatConfig {
     private static boolean forwardDeaths = true;
     private static boolean forwardAdvancements = true;
     private static boolean forwardStatus = true;
+    private static long rosterSeconds = 30;
     private static boolean displayEnabled = true;
     private static long maxCatchupAgeSeconds = 300;
     private static Set<String> ignoredSources = Set.of();
@@ -80,6 +81,11 @@ public final class MultiChatConfig {
 
     public static boolean forwardStatus() {
         return forwardStatus;
+    }
+
+    /** Interval between periodic roster (online player list) broadcasts; 0 disables them. */
+    public static long rosterSeconds() {
+        return rosterSeconds;
     }
 
     public static boolean displayEnabled() {
@@ -127,6 +133,7 @@ public final class MultiChatConfig {
             forwardDeaths = fileConfig.getOrElse("forward.deaths", true);
             forwardAdvancements = fileConfig.getOrElse("forward.advancements", true);
             forwardStatus = fileConfig.getOrElse("forward.status", true);
+            rosterSeconds = Math.max(0, fileConfig.<Number>getOrElse("forward.rosterSeconds", 30).longValue());
 
             displayEnabled = fileConfig.getOrElse("display.enabled", true);
             maxCatchupAgeSeconds = fileConfig.<Number>getOrElse("display.maxCatchupAgeSeconds", 300).longValue();
@@ -186,6 +193,10 @@ public final class MultiChatConfig {
             deaths = true
             advancements = true
             status = true                # server started/stopping notices
+            # Periodic "roster" event listing the online players, so consumers (e.g. the
+            # Discord bot status) know the exact player count instead of tallying
+            # join/leave events. Seconds between broadcasts; 0 disables them.
+            rosterSeconds = 30
 
             # What THIS server prints into its own chat.
             [display]

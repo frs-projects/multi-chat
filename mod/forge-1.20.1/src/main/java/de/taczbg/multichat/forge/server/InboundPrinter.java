@@ -16,6 +16,11 @@ final class InboundPrinter {
     }
 
     static void print(MinecraftServer server, ChatMessage msg) {
+        // Rosters are periodic telemetry for consumers like the Discord bot status;
+        // printing them would spam chat every few seconds on every server.
+        if ("roster".equals(msg.type())) {
+            return;
+        }
         if (!MultiChatConfig.displayEnabled()
                 || MultiChatConfig.ignoredSources().contains(msg.source())
                 || MultiChatConfig.ignoredTypes().contains(msg.type())) {
