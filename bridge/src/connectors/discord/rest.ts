@@ -6,11 +6,31 @@
 const API = "https://discord.com/api/v10";
 const MAX_ATTEMPTS = 3;
 
+/**
+ * Relayed text is attacker-controlled: anyone on any connected server can type "@everyone".
+ * Nothing we send may ever ping, so the suppression lives here rather than at the call
+ * sites - callers cannot opt in to mentions because they cannot set the field at all.
+ */
+const NO_MENTIONS: { parse: string[] } = { parse: [] };
+
+/** Invisible, so the message still reads exactly as it was typed. */
+const ZWSP = "​";
+
+/**
+ * Second layer under NO_MENTIONS: breaks the mention syntax itself so a relayed
+ * "@everyone" cannot even look like a real ping, and survives Discord ever changing how
+ * allowed_mentions is applied. Handles the mass-ping keywords plus raw <@id>/<@&id> forms.
+ */
+export function neutralizeMentions(text: string): string {
+  return text
+    .replace(/@(everyone|here)/gi, `@${ZWSP}$1`)
+    .replace(/<(@[!&]?\d+)>/g, `<${ZWSP}$1>`);
+}
+
 export interface WebhookPayload {
   content: string;
   username?: string;
   avatar_url?: string;
-  allowed_mentions: { parse: string[] };
 }
 
 export class DiscordRest {
@@ -20,7 +40,11 @@ export class DiscordRest {
 
   sendWebhook(webhookUrl: string, payload: WebhookPayload): Promise<void> {
     return this.enqueue(webhookUrl, () =>
-      this.post(`${webhookUrl}?wait=true`, { "Content-Type": "application/json" }, payload));
+      this.post(`${webhookUrl}?wait=true`, { "Content-Type": "application/json" }, {
+        ...payload,
+        content: neutralizeMentions(payload.content),
+        allowed_mentions: NO_MENTIONS,
+      }));
   }
 
   sendChannelMessage(token: string, channelId: string, content: string): Promise<void> {
@@ -28,7 +52,7 @@ export class DiscordRest {
       this.post(`${API}/channels/${channelId}/messages`, {
         "Content-Type": "application/json",
         Authorization: `Bot ${token}`,
-      }, { content, allowed_mentions: { parse: [] } }));
+      }, { content: neutralizeMentions(content), allowed_mentions: NO_MENTIONS }));
   }
 
   /** Serializes tasks per destination so retry_after sleeps hold back the whole queue. */

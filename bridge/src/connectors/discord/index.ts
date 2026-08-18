@@ -73,14 +73,10 @@ export function createDiscordConnector(cfg: DiscordConfig, log: (...args: unknow
           content: stripColors(msg.content),
           username: `${msg.name} @ ${msg.source}`,
           avatar_url: msg.uuid ? `https://mc-heads.net/avatar/${msg.uuid}` : undefined,
-          allowed_mentions: { parse: [] },
         });
       } else {
         const template = cfg.formats[msg.type] ?? cfg.formats.default;
-        await rest.sendWebhook(rule.webhook, {
-          content: stripColors(format(template, msg)),
-          allowed_mentions: { parse: [] },
-        });
+        await rest.sendWebhook(rule.webhook, { content: stripColors(format(template, msg)) });
       }
     } else if (cfg.token && rule.channel) {
       const template = cfg.formats[msg.type] ?? cfg.formats.default;
