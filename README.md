@@ -25,16 +25,16 @@ consumer group — so endpoints that were down catch up on missed messages (capp
 
 | Path | What |
 |---|---|
-| `mod/core/` | Loader-independent Java core: hand-rolled RESP client, stream bus, message model, public API. Zero dependencies — no shading, shared by every loader node. |
-| `mod/src/` | One Stonecutter source tree. `mc/` holds the shared runtime (config, event taps, chat printing, `/multichat` commands); `forge/` and `neoforge/` are thin entry points gated with `//? if forge {` / `//? if neoforge {` that forward loader events to it. Git holds the tree as the `1.21.1-neoforge` node, so the Forge file is committed commented out. |
-| `mod/versions/<node>/` | Per-node dependency versions (`1.20.1-forge`, `1.21.1-neoforge`). Adding a node is one `match(...)` line in `mod/settings.gradle.kts` plus this file. |
+| `core/` | Loader-independent Java core: hand-rolled RESP client, stream bus, message model, public API. Zero dependencies — no shading, shared by every loader node. |
+| `src/` | One Stonecutter source tree. `mc/` holds the shared runtime (config, event taps, chat printing, `/multichat` commands); `forge/` and `neoforge/` are thin entry points gated with `//? if forge {` / `//? if neoforge {` that forward loader events to it. Git holds the tree as the `1.21.1-neoforge` node, so the Forge file is committed commented out. |
+| `versions/<node>/` | Per-node dependency versions (`1.20.1-forge`, `1.21.1-neoforge`). Adding a node is one `match(...)` line in `settings.gradle.kts` plus this file. |
 
 ## Link-Mod (Forge 1.20.1, NeoForge 1.21.1)
 
-Build: `cd mod && ./gradlew buildAll` → `mod/versions/<node>/build/libs/multichat-<version>+<node>.jar` (`./gradlew collectJars` gathers them into `mod/build/libs`)
-(`./gradlew collectJars` copies every node's jar into `mod/build/libs`). Same build framework as
+Build: `./gradlew buildAll` → `versions/<node>/build/libs/multichat-<version>+<node>.jar`
+(`./gradlew collectJars` copies every node's jar into `build/libs`). Same build framework as
 ModSync: Stonecutter + Architectury Loom, Gradle 9.7 with its daemon on **Java 25**
-(`mod/gradle/gradle-daemon-jvm.properties`); the jar itself targets Java 17. `./gradlew checkAll`
+(`gradle/gradle-daemon-jvm.properties`); the jar itself targets Java 17. `./gradlew checkAll`
 also runs `verifyModMetadata`, which fails the build if a jar is missing its `mods.toml` or
 `pack.mcmeta`.
 
@@ -86,7 +86,7 @@ both connections reconnect with backoff.
 
 ### API for other mods
 
-Add `mod/core` sources/jar to your compile classpath (the classes ship inside the
+Add `core` sources/jar to your compile classpath (the classes ship inside the
 multichat jar at runtime):
 
 ```java
@@ -109,8 +109,8 @@ The bridge to Discord and other platforms is a separate Bun service: see
 ## Local testing without Discord
 
 ```sh
-docker compose up -d                 # throwaway Redis on 127.0.0.1:6379
-cd mod && ./gradlew :1.20.1-forge:runServer   # dev server; set server.id in versions/1.20.1-forge/run/server/config/
+redis-server                         # any local Redis on 127.0.0.1:6379
+./gradlew :1.20.1-forge:runServer   # dev server; set server.id in versions/1.20.1-forge/run/server/config/
 # in a second terminal, from a multichat-bridges checkout:
 CLI_ENABLED=true bun run bridge.ts
 ```
@@ -123,7 +123,7 @@ redis-cli XADD multichat:events '*' source EU_2 type chat name Tester content he
 redis-cli XRANGE multichat:events - +        # inspect what the mod/bridge wrote
 ```
 
-Unit tests: `cd mod && ./gradlew :core:test`.
+Unit tests: `./gradlew :core:test`.
 
 ## License
 

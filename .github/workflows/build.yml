@@ -12,10 +12,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-defaults:
-  run:
-    working-directory: mod
-
 jobs:
   core:
     name: core (no Minecraft)
@@ -34,7 +30,7 @@ jobs:
         if: always()
         with:
           name: core-test-results
-          path: mod/core/build/reports/tests/test/
+          path: core/build/reports/tests/test/
 
   matrix:
     name: ${{ matrix.node }}
@@ -58,7 +54,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: multichat-${{ matrix.node }}
-          path: mod/versions/${{ matrix.node }}/build/libs/multichat-*.jar
+          path: versions/${{ matrix.node }}/build/libs/multichat-*.jar
 
   release:
     name: release
@@ -84,7 +80,6 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Publish the release
-        working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
