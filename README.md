@@ -174,3 +174,7 @@ redis-cli XRANGE multichat:events - +        # inspect what the mod/bridge wrote
 Unit tests: `cd mod && ./gradlew :core:test` and `cd bridge && bun test`.
 `bridge/tools/spike-streams.ts` documents/verifies the Bun Redis stream behavior the
 bus relies on.
+
+## License
+
+LGPL-3.0-only. See [COPYING.LESSER](COPYING.LESSER) and [COPYING](COPYING).
