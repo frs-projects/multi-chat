@@ -1,0 +1,89 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    # Pushing a tag such as v1.0.2 also publishes a GitHub Release with every node's jar.
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: mod
+
+jobs:
+  core:
+    name: core (no Minecraft)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :core:test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-test-results
+          path: mod/core/build/reports/tests/test/
+
+  matrix:
+    name: ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node:
+          - forge-1.20.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew ":${{ matrix.node }}:build"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multichat-${{ matrix.node }}
+          path: mod/${{ matrix.node }}/build/libs/multichat-*.jar
+
+  release:
+    name: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [core, matrix]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      # A tag that disagrees with mod_version would publish jars named after a different
+      # version than the release, so refuse it rather than ship the mismatch.
+      - name: Check the tag matches mod_version
+        run: |
+          version=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match mod_version=$version"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: multichat-*
+          path: dist
+          merge-multiple: true
+      - name: Publish the release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Sources jars stay on the workflow run; the release carries what servers install.
+          find dist -name 'multichat-*.jar' ! -name '*-sources.jar' -print0 \
+            | xargs -0 gh release create "$GITHUB_REF_NAME" --title "Multi-Chat $GITHUB_REF_NAME" \
+                --generate-notes
