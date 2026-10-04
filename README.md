@@ -47,6 +47,32 @@ controlled under `[display]`: per-type format templates with `{source}` `{name}`
 Death/advancement texts are rendered server-side in English — a relay limitation worth
 knowing about, not a bug.
 
+### Securing the Redis connection
+
+Any Redis 6+ server works; what runs on it besides the stream is up to you. For a Redis
+reachable over the internet, enable TLS and give each endpoint its own ACL user:
+
+```toml
+[redis]
+host = "redis.example.org"
+port = 6380
+tls = true
+username = "multichat-EU_1"   # optional ACL user; leave out for password-only AUTH
+password = "…"
+```
+
+With `tls = true` the certificate and host name are verified, so the certificate must be
+trusted by the server's JVM (a public CA works as is). The mod and the bridge only need the
+stream key and a handful of commands, so a minimal ACL user looks like:
+
+```
+ACL SETUSER multichat-EU_1 on >password resetkeys ~multichat:events -@all +xadd +xreadgroup +xack +xgroup|create +ping
+```
+
+The bridge connects with `REDIS_URL=rediss://<user>:<password>@<host>:<port>`. Anything else
+that should see the network's chat (a web dashboard, moderation tooling, statistics) can
+read the same stream through its own consumer group.
+
 `/multichat status` (op) shows connection state; `/multichat reload` applies config
 changes live. Redis being down never blocks the server: publishing is queue-based and
 both connections reconnect with backoff.
