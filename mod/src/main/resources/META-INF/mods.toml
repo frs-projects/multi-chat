@@ -1,0 +1,28 @@
+modLoader = "javafml"
+loaderVersion = "${forge_range}"
+license = "${license}"
+issueTrackerURL = "${source}/issues"
+
+[[mods]]
+modId = "${id}"
+version = "${version}"
+displayName = "${name}"
+description = '''${description}'''
+authors = "${authors}"
+displayURL = "${source}"
+# Server-only mod: no network channel, no client classes. Clients never need it installed.
+displayTest = "IGNORE_ALL_VERSION"
+
+[[dependencies.${id}]]
+modId = "forge"
+mandatory = true
+versionRange = "${forge_range}"
+ordering = "NONE"
+side = "SERVER"
+
+[[dependencies.${id}]]
+modId = "minecraft"
+mandatory = true
+versionRange = "${minecraft_range_forgelike}"
+ordering = "NONE"
+side = "SERVER"

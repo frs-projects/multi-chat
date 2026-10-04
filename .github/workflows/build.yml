@@ -25,7 +25,9 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          # Loom refuses to set up Minecraft on a daemon older than the version
+          # Minecraft itself requires, so the daemon runs on the newest in the matrix.
+          java-version: 25
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew :core:test
       - uses: actions/upload-artifact@v4
@@ -41,19 +43,21 @@ jobs:
       fail-fast: false
       matrix:
         node:
-          - forge-1.20.1
+          - 1.20.1-forge
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew ":${{ matrix.node }}:build"
+      # `check` runs verifyModMetadata, which is the guard against shipping a jar
+      # that builds but contains no loader metadata.
+      - run: ./gradlew ":${{ matrix.node }}:build" ":${{ matrix.node }}:check"
       - uses: actions/upload-artifact@v4
         with:
           name: multichat-${{ matrix.node }}
-          path: mod/${{ matrix.node }}/build/libs/multichat-*.jar
+          path: mod/versions/${{ matrix.node }}/build/libs/multichat-*.jar
 
   release:
     name: release
@@ -64,13 +68,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      # A tag that disagrees with mod_version would publish jars named after a different
+      # A tag that disagrees with mod.version would publish jars named after a different
       # version than the release, so refuse it rather than ship the mismatch.
-      - name: Check the tag matches mod_version
+      - name: Check the tag matches mod.version
         run: |
-          version=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          version=$(grep '^mod.version=' gradle.properties | cut -d= -f2)
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match mod_version=$version"
+            echo "::error::Tag $GITHUB_REF_NAME does not match mod.version=$version"
             exit 1
           fi
       - uses: actions/download-artifact@v4

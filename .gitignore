@@ -1,19 +1,10 @@
-# Gradle / ForgeGradle
-mod/.gradle/
-mod/build/
-mod/*/build/
-mod/forge-1.20.1/run/
-mod/forge-1.20.1/run-data/
+# The mod's build outputs are ignored in mod/.gitignore.
 
 # IDE
 .idea/
 *.iml
 .vscode/
 .eclipse/
-mod/.settings/
-mod/*/.settings/
-mod/.classpath
-mod/.project
 
 # Bridge
 bridge/node_modules/

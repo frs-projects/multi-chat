@@ -24,12 +24,18 @@ consumer group — so endpoints that were down catch up on missed messages (capp
 | Path | What |
 |---|---|
 | `mod/core/` | Loader-independent Java core: hand-rolled RESP client, stream bus, message model, public API. Zero dependencies — no shading, trivially reused by future Fabric/NeoForge variants. |
-| `mod/forge-1.20.1/` | Thin Forge adapter: config, event taps, chat printing, `/multichat` commands. |
+| `mod/src/` | Thin Forge adapter: config, event taps, chat printing, `/multichat` commands. One Stonecutter source tree; loader-specific files are gated with `//? if forge {`. |
+| `mod/versions/<node>/` | Per-node dependency versions (`1.20.1-forge` today). Adding a node is one `match(...)` line in `mod/settings.gradle.kts` plus this file. |
 | `bridge/` | Bun/TypeScript bridge framework with pluggable connectors (`discord`, `cli`). Zero npm dependencies. |
 
 ## Link-Mod (Forge 1.20.1)
 
-Build (needs JDK 17 for Gradle): `cd mod && ./gradlew build` → `mod/forge-1.20.1/build/libs/multichat-1.0.0.jar`
+Build: `cd mod && ./gradlew buildAll` → `mod/versions/1.20.1-forge/build/libs/multichat-<version>+1.20.1-forge.jar`
+(`./gradlew collectJars` copies every node's jar into `mod/build/libs`). Same build framework as
+ModSync: Stonecutter + Architectury Loom, Gradle 9.7 with its daemon on **Java 25**
+(`mod/gradle/gradle-daemon-jvm.properties`); the jar itself targets Java 17. `./gradlew checkAll`
+also runs `verifyModMetadata`, which fails the build if a jar is missing its `mods.toml` or
+`pack.mcmeta`.
 
 Server-only — clients never need it installed. On first boot it writes
 `config/multichat-common.toml`; set `server.id` (the mod stays dormant while it is
@@ -158,7 +164,7 @@ One folder under `bridge/src/connectors/<name>/` exporting a factory that return
 
 ```sh
 docker compose up -d                 # throwaway Redis on 127.0.0.1:6379
-cd mod && ./gradlew :forge-1.20.1:runServer   # dev server; set server.id in run/config/
+cd mod && ./gradlew :1.20.1-forge:runServer   # dev server; set server.id in versions/1.20.1-forge/run/server/config/
 # in a second terminal:
 cd bridge && CLI_ENABLED=true bun run bridge.ts
 ```
