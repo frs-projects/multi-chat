@@ -23,14 +23,14 @@ consumer group — so endpoints that were down catch up on missed messages (capp
 
 | Path | What |
 |---|---|
-| `mod/core/` | Loader-independent Java core: hand-rolled RESP client, stream bus, message model, public API. Zero dependencies — no shading, trivially reused by future Fabric/NeoForge variants. |
-| `mod/src/` | Thin Forge adapter: config, event taps, chat printing, `/multichat` commands. One Stonecutter source tree; loader-specific files are gated with `//? if forge {`. |
-| `mod/versions/<node>/` | Per-node dependency versions (`1.20.1-forge` today). Adding a node is one `match(...)` line in `mod/settings.gradle.kts` plus this file. |
+| `mod/core/` | Loader-independent Java core: hand-rolled RESP client, stream bus, message model, public API. Zero dependencies — no shading, shared by every loader node. |
+| `mod/src/` | One Stonecutter source tree. `mc/` holds the shared runtime (config, event taps, chat printing, `/multichat` commands); `forge/` and `neoforge/` are thin entry points gated with `//? if forge {` / `//? if neoforge {` that forward loader events to it. Git holds the tree as the `1.21.1-neoforge` node, so the Forge file is committed commented out. |
+| `mod/versions/<node>/` | Per-node dependency versions (`1.20.1-forge`, `1.21.1-neoforge`). Adding a node is one `match(...)` line in `mod/settings.gradle.kts` plus this file. |
 | `bridge/` | Bun/TypeScript bridge framework with pluggable connectors (`discord`, `cli`). Zero npm dependencies. |
 
-## Link-Mod (Forge 1.20.1)
+## Link-Mod (Forge 1.20.1, NeoForge 1.21.1)
 
-Build: `cd mod && ./gradlew buildAll` → `mod/versions/1.20.1-forge/build/libs/multichat-<version>+1.20.1-forge.jar`
+Build: `cd mod && ./gradlew buildAll` → `mod/versions/<node>/build/libs/multichat-<version>+<node>.jar` (`./gradlew collectJars` gathers them into `mod/build/libs`)
 (`./gradlew collectJars` copies every node's jar into `mod/build/libs`). Same build framework as
 ModSync: Stonecutter + Architectury Loom, Gradle 9.7 with its daemon on **Java 25**
 (`mod/gradle/gradle-daemon-jvm.properties`); the jar itself targets Java 17. `./gradlew checkAll`

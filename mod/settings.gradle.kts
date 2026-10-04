@@ -29,10 +29,11 @@ stonecutter {
             version("$mc-$it", mc).buildscript = "build.$it.gradle.kts"
         }
 
-        // Server-side only, so a new node needs only that loader's event wiring
-        // (see src/main/java/de/taczbg/multichat/forge).
+        // Server-side only, so a node is just that loader's entry point forwarding events
+        // to the shared runtime (see src/main/java/de/taczbg/multichat/<loader>).
         match("1.20.1", "forge")
+        match("1.21.1", "neoforge")
 
-        vcsVersion = "1.20.1-forge"
+        vcsVersion = "1.21.1-neoforge"
     }
 }

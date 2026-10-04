@@ -1,7 +1,6 @@
-package de.taczbg.multichat.forge.server;
+package de.taczbg.multichat.mc;
 
 import de.taczbg.multichat.core.ChatMessage;
-import de.taczbg.multichat.forge.config.MultiChatConfig;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 

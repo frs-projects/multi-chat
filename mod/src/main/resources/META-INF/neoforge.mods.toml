@@ -1,0 +1,28 @@
+modLoader = "javafml"
+loaderVersion = "${javafml_range}"
+license = "${license}"
+issueTrackerURL = "${source}/issues"
+
+[[mods]]
+modId = "${id}"
+version = "${version}"
+displayName = "${name}"
+description = '''${description}'''
+authors = "${authors}"
+displayURL = "${source}"
+# Server-only mod: no network channel, no client classes. NeoForge has no displayTest;
+# a mod without payloads never makes the client list it as missing.
+
+[[dependencies.${id}]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neoforge_range}"
+ordering = "NONE"
+side = "SERVER"
+
+[[dependencies.${id}]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_range_forgelike}"
+ordering = "NONE"
+side = "SERVER"

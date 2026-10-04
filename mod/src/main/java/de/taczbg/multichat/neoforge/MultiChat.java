@@ -1,28 +1,25 @@
-//? if forge {
-/*package de.taczbg.multichat.forge;
+//? if neoforge {
+package de.taczbg.multichat.neoforge;
 
 import de.taczbg.multichat.mc.MultiChatRuntime;
-import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.advancements.DisplayInfo;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.ServerChatEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.player.AdvancementEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.server.ServerStartedEvent;
-import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.loading.FMLPaths;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.ServerChatEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.player.AdvancementEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
-// Forge entry point: the loader's events, forwarded to MultiChatRuntime, and nothing else.
-//
-// Only line comments here, and in every other loader-gated file: Stonecutter comments an
-// inactive file out with one block comment, which a Javadoc block inside would end early.
+// NeoForge entry point: the loader's events, forwarded to MultiChatRuntime, and nothing else.
+// The same runtime the Forge build uses; everything here is a spelling difference.
 @Mod(MultiChatRuntime.MOD_ID)
 public final class MultiChat {
 
@@ -30,7 +27,7 @@ public final class MultiChat {
 
     public MultiChat() {
         // The game event bus, not the mod bus: everything below is a running-server event.
-        MinecraftForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(this);
     }
 
     @SubscribeEvent
@@ -49,10 +46,8 @@ public final class MultiChat {
     }
 
     @SubscribeEvent
-    public void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
-            runtime.onServerTick(event.getServer());
-        }
+    public void onServerTick(ServerTickEvent.Post event) {
+        runtime.onServerTick(event.getServer());
     }
 
     @SubscribeEvent
@@ -83,14 +78,12 @@ public final class MultiChat {
 
     @SubscribeEvent
     public void onAdvancement(AdvancementEvent.AdvancementEarnEvent event) {
-        Advancement advancement = event.getAdvancement();
-        DisplayInfo display = advancement.getDisplay();
+        AdvancementHolder advancement = event.getAdvancement();
+        DisplayInfo display = advancement.value().display().orElse(null);
         if (event.getEntity() instanceof ServerPlayer player && display != null && display.shouldAnnounceChat()) {
-            // Mirrors PlayerAdvancements' chat broadcast, rendered server-side (en_us).
-            runtime.onAdvancement(player, () -> Component.translatable(
-                    "chat.type.advancement." + display.getFrame().getName(),
-                    player.getDisplayName(), advancement.getChatComponent()));
+            // The component PlayerAdvancements broadcasts, rendered server-side (en_us).
+            runtime.onAdvancement(player, () -> display.getType().createAnnouncement(advancement, player));
         }
     }
 }
-*///?}
+//?}

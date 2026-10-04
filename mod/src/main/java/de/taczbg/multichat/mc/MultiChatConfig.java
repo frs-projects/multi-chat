@@ -1,4 +1,4 @@
-package de.taczbg.multichat.forge.config;
+package de.taczbg.multichat.mc;
 
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.mojang.logging.LogUtils;
@@ -18,7 +18,7 @@ import java.util.Set;
 /**
  * Loads {@code config/multichat-common.toml}. Same hand-rolled NightConfig approach as
  * servertransfer's TransferConfig: read directly (NightConfig is on the classpath via
- * Forge), default template written on first run, reloadable via "/multichat reload".
+ * Forge and NeoForge), default template written on first run, reloadable via "/multichat reload".
  * All fields are only written on the server thread (load/reload) and read as snapshots.
  */
 public final class MultiChatConfig {
