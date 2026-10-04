@@ -291,6 +291,6 @@ public final class RedisStreamBus {
     }
 
     private RespClient newClient(int soTimeoutMs) {
-        return new RespClient(cfg.host(), cfg.port(), cfg.username(), cfg.password(), soTimeoutMs);
+        return new RespClient(cfg.host(), cfg.port(), cfg.tls(), cfg.username(), cfg.password(), soTimeoutMs);
     }
 }

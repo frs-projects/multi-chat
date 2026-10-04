@@ -6,6 +6,7 @@ package de.taczbg.multichat.core;
  *
  * @param host             Redis host
  * @param port             Redis port
+ * @param tls              connect with TLS, verifying the certificate and host name
  * @param username         optional ACL username; empty for legacy single-password AUTH
  * @param password         optional password; empty disables AUTH
  * @param streamKey        stream key, e.g. "multichat:events"
@@ -14,7 +15,7 @@ package de.taczbg.multichat.core;
  * @param catchupMaxAgeMs  entries older than this are ACKed without being displayed
  * @param blockMs          XREADGROUP BLOCK duration; socket timeout is set well above this
  */
-public record CoreConfig(String host, int port, String username, String password,
+public record CoreConfig(String host, int port, boolean tls, String username, String password,
                          String streamKey, String serverId, long maxStreamLength,
                          long catchupMaxAgeMs, long blockMs) {
 

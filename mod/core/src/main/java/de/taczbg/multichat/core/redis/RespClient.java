@@ -8,6 +8,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 /**
  * Minimal blocking Redis client over one TCP socket — just enough for stream pub/sub
@@ -25,6 +28,7 @@ public final class RespClient implements Closeable {
 
     private final String host;
     private final int port;
+    private final boolean tls;
     private final String username;
     private final String password;
     private final int soTimeoutMs;
@@ -34,13 +38,16 @@ public final class RespClient implements Closeable {
     private OutputStream out;
 
     /**
+     * @param tls         wrap the connection in TLS, verifying the server certificate against
+     *                    the JVM's trust store and its host name
      * @param soTimeoutMs socket read timeout; must be comfortably above the longest
      *                    XREADGROUP BLOCK the caller intends to use, so a dead server
      *                    surfaces as an exception instead of hanging forever.
      */
-    public RespClient(String host, int port, String username, String password, int soTimeoutMs) {
+    public RespClient(String host, int port, boolean tls, String username, String password, int soTimeoutMs) {
         this.host = host;
         this.port = port;
+        this.tls = tls;
         this.username = username == null ? "" : username;
         this.password = password == null ? "" : password;
         this.soTimeoutMs = soTimeoutMs;
@@ -52,6 +59,15 @@ public final class RespClient implements Closeable {
         socket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
         socket.setSoTimeout(soTimeoutMs);
         socket.setTcpNoDelay(true);
+        if (tls) {
+            SSLSocket secure = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
+                    .createSocket(socket, host, port, true);
+            SSLParameters params = secure.getSSLParameters();
+            params.setEndpointIdentificationAlgorithm("HTTPS");
+            secure.setSSLParameters(params);
+            secure.startHandshake();
+            socket = secure;
+        }
         in = new BufferedInputStream(socket.getInputStream());
         out = new BufferedOutputStream(socket.getOutputStream());
         if (!password.isEmpty()) {

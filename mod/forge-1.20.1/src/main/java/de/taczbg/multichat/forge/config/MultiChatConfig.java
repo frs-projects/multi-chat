@@ -38,6 +38,7 @@ public final class MultiChatConfig {
 
     private static String host = "127.0.0.1";
     private static int port = 6379;
+    private static boolean tls = false;
     private static String username = "";
     private static String password = "";
     private static String streamKey = "multichat:events";
@@ -106,7 +107,7 @@ public final class MultiChatConfig {
     }
 
     public static CoreConfig toCoreConfig() {
-        return new CoreConfig(host, port, username, password, streamKey, serverId,
+        return new CoreConfig(host, port, tls, username, password, streamKey, serverId,
                 maxStreamLength, maxCatchupAgeSeconds * 1000, BLOCK_MS);
     }
 
@@ -121,6 +122,7 @@ public final class MultiChatConfig {
 
             host = fileConfig.getOrElse("redis.host", "127.0.0.1");
             port = fileConfig.<Number>getOrElse("redis.port", 6379).intValue();
+            tls = fileConfig.getOrElse("redis.tls", false);
             username = fileConfig.getOrElse("redis.username", "");
             password = fileConfig.getOrElse("redis.password", "");
             streamKey = fileConfig.getOrElse("redis.streamKey", "multichat:events");
@@ -181,6 +183,7 @@ public final class MultiChatConfig {
             [redis]
             host = "127.0.0.1"
             port = 6379
+            tls = false                  # true for a TLS-enabled Redis (certificate + host name are verified)
             # username = ""              # optional ACL user; leave out for password-only AUTH
             password = ""
             streamKey = "multichat:events"
