@@ -12,6 +12,8 @@ MC server A (Link-Mod) ─┐                      ┌─ MC server B (Link-Mod)
 Discord  (bridge) ──────┘   multichat:events   └─ CLI / future connectors (bridge)
 ```
 
+The bridges (Discord, CLI, …) live in their own repository: [multichat-bridges](https://github.com/frs-projects/multichat-bridges).
+
 Every endpoint writes flat field/value entries (`source`, `type`, `uuid`, `name`,
 `content`, `ts`, `meta`) onto one Redis **stream** and consumes it through its own
 consumer group — so endpoints that were down catch up on missed messages (capped by
@@ -26,7 +28,6 @@ consumer group — so endpoints that were down catch up on missed messages (capp
 | `mod/core/` | Loader-independent Java core: hand-rolled RESP client, stream bus, message model, public API. Zero dependencies — no shading, shared by every loader node. |
 | `mod/src/` | One Stonecutter source tree. `mc/` holds the shared runtime (config, event taps, chat printing, `/multichat` commands); `forge/` and `neoforge/` are thin entry points gated with `//? if forge {` / `//? if neoforge {` that forward loader events to it. Git holds the tree as the `1.21.1-neoforge` node, so the Forge file is committed commented out. |
 | `mod/versions/<node>/` | Per-node dependency versions (`1.20.1-forge`, `1.21.1-neoforge`). Adding a node is one `match(...)` line in `mod/settings.gradle.kts` plus this file. |
-| `bridge/` | Bun/TypeScript bridge framework with pluggable connectors (`discord`, `cli`). Zero npm dependencies. |
 
 ## Link-Mod (Forge 1.20.1, NeoForge 1.21.1)
 
@@ -100,73 +101,18 @@ Custom types ride the same stream; other servers print them with the `default` f
 routes them via each channel's `types` filter. The `source` field is always stamped by
 the mod — callers cannot spoof another server.
 
-## Bridge (Bun)
+## Bridges
 
-```sh
-cd bridge
-cp .env.example .env   # then edit
-bun run bridge.ts
-```
-
-Or containerized: `cd bridge && docker compose up -d --build`. Configuration is
-**env-only** — no config files. See [bridge/.env.example](bridge/.env.example) for the
-full reference; in a deploy platform (Dokploy etc.) just set the variables in the UI.
-
-Zero npm dependencies; Redis via Bun's built-in client, Discord via a minimal
-hand-rolled Gateway client. Idle cost is one blocked Redis read plus a heartbeat.
-Each connector gets its own consumer group (`bridge:<id>`) and loop, so a slow platform
-never blocks another.
-
-### Discord setup
-
-1. Create an application + bot at <https://discord.com/developers/applications>, copy the token.
-2. **Enable the "Message Content Intent"** under Bot → Privileged Gateway Intents —
-   without it Discord delivers empty message content and inbound bridging silently does nothing.
-3. Invite the bot to your guild (scope `bot`, permission View Channels + Send Messages).
-4. Create a webhook in each bridged channel (Channel settings → Integrations) for
-   outbound messages with per-player name + avatar; without a webhook the bridge falls
-   back to plain bot messages.
-5. Set one `DISCORD_CHANNEL_<n>_*` variable group per channel (numbering starts at 1):
-   `_ID` for inbound reading, `_WEBHOOK` for outbound, `_TYPES`/`_SOURCES` filters,
-   `_INBOUND` toggle. The connector activates as soon as one group is set.
-
-Mentions are neutralized (`@everyone` etc. never ping) and Minecraft § codes are stripped.
-
-### Bot status counters
-
-With a bot token the connector shows live counters as its Discord status, e.g.
-*Watching 12 players on 3 servers*, taken from the stream itself:
-
-- **`roster` events** are authoritative: each one replaces what the bridge knew about that
-  server, so a lost event or a crash can't leave the count drifting. They also act as a
-  heartbeat — a server that stops sending them for `DISCORD_PRESENCE_ROSTER_TTL_SECONDS`
-  (default 120) drops out of the counters even without a `stopping` event.
-- **`join`/`leave`/`status` events** keep the number live between two rosters, and are the
-  whole story for servers that don't send rosters (`rosterSeconds = 0`, older mod build).
-  Players are tracked as a set per server, so duplicate joins can't inflate the count;
-  `started` resets a server to empty, `stopping` removes it and its players.
-
-A roster-less server therefore starts at zero when the bridge boots and is counted from
-its next event onward; a roster-sending one is exact within one interval. Rosters are not
-relayed to any channel unless a rule names the type (`DISCORD_CHANNEL_n_TYPES=roster`) —
-a `*` filter deliberately doesn't match them. Status updates are throttled to one per 15s
-(Discord allows 5 per 20s) and re-pushed after a reconnect. Configure with
-`DISCORD_PRESENCE_TEMPLATE` (`{players}`, `{servers}`), `DISCORD_PRESENCE_ACTIVITY`,
-`DISCORD_PRESENCE_ENABLED`.
-
-### Adding another platform
-
-One folder under `bridge/src/connectors/<name>/` exporting a factory that returns the
-`Connector` interface (`start`/`stop`/`deliver` + `ctx.publish`), a few env variables in
-`config.ts`, one line in `bridge.ts`. The `cli` connector (~40 lines) is the reference.
+The bridge to Discord and other platforms is a separate Bun service: see
+[multichat-bridges](https://github.com/frs-projects/multichat-bridges) for setup, Discord configuration and adding connectors.
 
 ## Local testing without Discord
 
 ```sh
 docker compose up -d                 # throwaway Redis on 127.0.0.1:6379
 cd mod && ./gradlew :1.20.1-forge:runServer   # dev server; set server.id in versions/1.20.1-forge/run/server/config/
-# in a second terminal:
-cd bridge && CLI_ENABLED=true bun run bridge.ts
+# in a second terminal, from a multichat-bridges checkout:
+CLI_ENABLED=true bun run bridge.ts
 ```
 
 Typed lines in the bridge terminal appear in the server chat and vice versa. A second
@@ -177,9 +123,7 @@ redis-cli XADD multichat:events '*' source EU_2 type chat name Tester content he
 redis-cli XRANGE multichat:events - +        # inspect what the mod/bridge wrote
 ```
 
-Unit tests: `cd mod && ./gradlew :core:test` and `cd bridge && bun test`.
-`bridge/tools/spike-streams.ts` documents/verifies the Bun Redis stream behavior the
-bus relies on.
+Unit tests: `cd mod && ./gradlew :core:test`.
 
 ## License
 

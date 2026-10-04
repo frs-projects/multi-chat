@@ -6,6 +6,3 @@
 .vscode/
 .eclipse/
 
-# Bridge
-bridge/node_modules/
-bridge/.env
