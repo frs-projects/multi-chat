@@ -28,6 +28,7 @@ consumer group — so endpoints that were down catch up on missed messages (capp
 | `core/` | Loader-independent Java core: hand-rolled RESP client, stream bus, message model, public API. Zero dependencies — no shading, shared by every loader node. |
 | `src/` | One Stonecutter source tree. `mc/` holds the shared runtime (config, event taps, chat printing, `/multichat` commands); `forge/` and `neoforge/` are thin entry points gated with `//? if forge {` / `//? if neoforge {` that forward loader events to it. Git holds the tree as the `1.21.1-neoforge` node, so the Forge file is committed commented out. |
 | `versions/<node>/` | Per-node dependency versions (`1.20.1-forge`, `1.21.1-neoforge`). Adding a node is one `match(...)` line in `settings.gradle.kts` plus this file. |
+| `framework/` | The [frs-projects/mod-framework](https://github.com/frs-projects/mod-framework) submodule: the build logic shared with the other FRS-Projects mods. Clone with `--recurse-submodules` (or run `git submodule update --init`). |
 
 ## Link-Mod (Forge 1.20.1, NeoForge 1.21.1)
 
