@@ -1,5 +1,11 @@
 # Multi-Chat
 
+| Side | Status | Notes |
+| --- | --- | --- |
+| **Server** | Required | Links the server's chat to the Redis stream. |
+| **Client** | Not needed | Vanilla clients can join. |
+| **Singleplayer** | Not intended | It loads on the integrated server, but it is built to link dedicated servers. |
+
 Links multiple Minecraft servers' chats together through a Redis stream, and optionally
 bridges them to external platforms (Discord first).
 
